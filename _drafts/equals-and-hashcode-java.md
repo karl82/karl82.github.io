@@ -6,8 +6,8 @@ tags: [java, lombok, unit tests]
 
 I had to add few fields into existing class wchih was simple POJO, but was used
 in collections. And had `equals` and `hashCode` defined. I forgot to update
-`hashCode` (which I discovered when I read my change before sending it to code
-review).
+`hashCode`. _Which I discovered when I was checking my change before sending it to code
+review. World is saved. Go sleep._
 
 #General contract for `equals` and `hashCode`
 
@@ -59,6 +59,16 @@ You can write your own unit tests(and tons of code around it) or use
 [EqualsTester](https://static.javadoc.io/com.google.guava/guava-testlib/19.0/com/google/common/testing/EqualsTester.html)
 from guava (which is the preferable way).
 
+```java
+new EqualsTester()
+    .addEqualityGroup(
+        new Foobar("hello"),
+        new Foobar("hello"))
+    .addEqualityGroup(
+        new Foobar("bye"))
+    .testEquals();
+```
+
 #Unit testing `hashCode()` is hard
 
 Wait. It is easy too! Use
@@ -66,10 +76,79 @@ Wait. It is easy too! Use
 too. According to javadoc:
 
 > This tests:
->
-> &lt;snip&gt;
+> * ...
 > * the hash codes of any two equal objects are equal
 
-That's great, because you will follow the contract.
+That's great, because you will follow the contract. And that's probably the only
+thing that you can test about hash code. You cannot really test when 2 objects
+are not equal, then hash code shouldn't be equal too. Maybe for simple classes
+where hash is taken from id on integer range.
 
-The problem is that if you forget to 
+The problem is that if you forget to update `hashCode`, you will live in
+unconsciousness that your `hashCode` method is ineffective and producing a lot
+of collisions for inserting into hashed collections. You will very likely
+discover it during integration tests when the time needed to execute test will
+dramatically increase. The worse scenario is the discovery in production...
+
+#How to deal with `equals` and `hashCode` invariant
+
+To ensure that you covered all fields in `equals` and `hashCode` you can:
+
+* Use code generator, like [Project Lombok](https://projectlombok.org/) and it's
+  [@EqualsAndHashCode](https://projectlombok.org/features/EqualsAndHashCode.html)
+  annotation.
+* Write your own tester to which you put list of fields which should participate
+  on the equality and hash codes. It will analyze bytecode of the methods if
+  fields are read.
+
+##@EqualsAndHashCode
+
+I'm big fan of this approach. If your class is annotated just with
+`@EqualsAndHashCode`, Lombok will generate `equals` and `hashCode` from all
+non-static, non-transient fields. You will never miss any new field! You have to
+rely on another framework, but it will save a lot of pain and makes your code
+readable. You should definitely use `EqualsTester` to ensure correctness of
+generated code!
+
+If you do not want to cover all fields, you can use `exclude` or `of` attributes
+to define your own set of fields which should be used for `equals` and
+`hashCode` generation. The advantage is that you have to manage just only one
+list of fields, clearly visible, not hidden somewhere in the class body and it's
+methods in two places!
+
+```java
+@EqualsAndHashCode(of={"foobar1"})
+public class MyFoobar {
+    private final int foobar1;
+    private final int foobar2;
+
+    public MyFoobar(int foobar1, int foobar2) {
+       this.foobar1 = foobar1;
+       this.foobar2 = foobar2;
+    }
+}
+
+...
+
+public class MyFoobarTest {
+    @Test
+    public void equalsAndHashCode() {
+        new EqualsTester()
+            .addEqualityGroup(
+                new MyFoobar(1, 2),
+                new MyFoobar(1, 999))
+            .addEqualityGroup(
+                new MyFoobar(999, 1))
+                new MyFoobar(999, 999))
+            .testEquals();
+    }
+}
+```
+
+##Checking legacy code with bytecode analyses
+
+This idea came to my mind during writing this post. What if you do not want to
+invest into rewriting your code base into Lombok? You would be happy if there is
+some tool which can analyse bytecode of existing classes and it will report
+discrepancies in usage of fields between `equals` and `hashCode`. Is it even
+possible?

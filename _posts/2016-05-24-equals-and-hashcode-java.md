@@ -1,7 +1,8 @@
 ---
-title: Unit testing `equals` and `hashCode`
+title: Unit testing equals and hashCode methods
+layout: post
 category: java
-tags: [java, lombok, unit tests]
+tags: [java, lombok, unittests]
 ---
 
 I had to add few fields into existing class wchih was simple POJO, but was used
@@ -9,37 +10,47 @@ in collections. And had `equals` and `hashCode` defined. I forgot to update
 `hashCode`. _Which I discovered when I was checking my change before sending it to code
 review. World is saved. Go sleep._
 
-#General contract for `equals` and `hashCode`
+# General contract for `equals` and `hashCode`
 
 From
 [Object.equals](https://docs.oracle.com/javase/7/docs/api/java/lang/Object.html#equals%28java.lang.Object%29)
+
 > The `equals` method implements an equivalence relation on non-null object
 > references:
+>
 > * It is _reflexive_: for any non-null reference value `x`, `x.equals(x)` should
 >   return `true`.
+>
 > * It is _symmetric_: for any non-null reference values `x` and `y`,
 >   `x.equals(y)` should return `true` if and only if `y.equals(x)` returns
 >   `true`.
+>
 > * It is _transitive_: for any non-null reference values `x`, `y`, and `z`, if
 >   `x.equals(y)` returns `true` and `y.equals(z)` returns `true`, then `x.equals(z)` should
 >   return `true`.
+>
 > * It is _consistent_: for any non-null reference values `x` and `y`, multiple
 >   invocations of `x.equals(y)` consistently return `true` or consistently return
 >   `false`, provided no information used in `equals` comparisons on the objects is
 >   modified.
+>
 > * For any non-null reference value `x`, `x.equals(null)` should return `false`.
 
 From
 [Object.hashCode](https://docs.oracle.com/javase/7/docs/api/java/lang/Object.html#hashCode%28%29)
+
 > The general contract of `hashCode` is:
+>
 > * Whenever it is invoked on the same object more than once during an execution
 >   of a Java application, the `hashCode` method must consistently return the same
 >   integer, provided no information used in `equals` comparisons on the object is
 >   modified. This integer need not remain consistent from one execution of an
 >   application to another execution of the same application.
+>
 > * If two objects are equal according to the `equals(Object)` method, then
 >   calling the `hashCode` method on each of the two objects must produce the same
 >   integer result.
+>
 > * It is not required that if two objects are unequal according to the
 >   `equals(java.lang.Object)` method, then calling the `hashCode` method on each
 >   of the two objects must produce distinct integer results. However, the
@@ -53,7 +64,7 @@ is diving deep into problems of `equals` and `hashCode`, so I will skip this.
 
 I would rather focus on unit testing of equality.
 
-#Unit testing `equals(Object)` is easy
+# Unit testing `equals(Object)` is easy
 
 You can write your own unit tests(and tons of code around it) or use
 [EqualsTester](https://static.javadoc.io/com.google.guava/guava-testlib/19.0/com/google/common/testing/EqualsTester.html)
@@ -69,20 +80,21 @@ new EqualsTester()
     .testEquals();
 ```
 
-#Unit testing `hashCode()` is hard
+# Unit testing `hashCode()` is hard
 
 Wait. It is easy too! Use
 [EqualsTester](https://static.javadoc.io/com.google.guava/guava-testlib/19.0/com/google/common/testing/EqualsTester.html)
 too. According to javadoc:
 
 > This tests:
-> * ...
+>
 > * the hash codes of any two equal objects are equal
 
 That's great, because you will follow the contract. And that's probably the only
 thing that you can test about hash code. You cannot really test when 2 objects
-are not equal, then hash code shouldn't be equal too. Maybe for simple classes
-where hash is taken from id on integer range.
+are not equal, because hash code might be or might not be equal. Only simple
+classes where hash is taken from id on integer range might define their hash
+function as perfect.
 
 The problem is that if you forget to update `hashCode`, you will live in
 unconsciousness that your `hashCode` method is ineffective and producing a lot
@@ -91,7 +103,7 @@ discover it during integration tests when the time needed to execute test will
 dramatically increase. The worse scenario is to discover such mistake in
 production...
 
-#How to deal with `equals` and `hashCode` invariant
+# How to deal with `equals` and `hashCode` invariant
 
 To ensure that you covered all fields in `equals` and `hashCode` you can:
 
@@ -102,7 +114,7 @@ To ensure that you covered all fields in `equals` and `hashCode` you can:
   on the equality and hash codes. It will analyze bytecode of the methods if
   fields are read.
 
-##@EqualsAndHashCode
+## @EqualsAndHashCode
 
 I'm big fan of this approach. If your class is annotated just with
 `@EqualsAndHashCode`, Lombok will generate `equals` and `hashCode` from all
@@ -146,7 +158,7 @@ public class MyFoobarTest {
 }
 ```
 
-##Checking legacy code with bytecode analyses
+## Checking legacy code with bytecode analyses
 
 This idea came to my mind during writing this post. What if you do not want to
 invest into rewriting your code base into Lombok? You would be happy if there is
@@ -160,12 +172,12 @@ functionality and didn't find it.
 So I quickly implemented PoC
 [here](https://github.com/karl82/equalshashcodereporter). It is using
 [ASM](http://asm.ow2.org/) for bytecode analyses. Usage is very simple as
-feature set.
+its feature set.
 
-* Currently detects only direct access to fields which are assigned in
-  constructors
+* Currently detects only direct access to fields
 * If field is `final` and value is known during compilation, no `GETFIELD`
-  operand is generated :(
+  operand is generated and such access is not detected
+* Takes all fields presented in `equals` or `hashCode`
 
 ```java
 package cz.rank.tests;

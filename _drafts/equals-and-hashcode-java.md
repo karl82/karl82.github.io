@@ -86,9 +86,10 @@ where hash is taken from id on integer range.
 
 The problem is that if you forget to update `hashCode`, you will live in
 unconsciousness that your `hashCode` method is ineffective and producing a lot
-of collisions for inserting into hashed collections. You will very likely
+of collisions during insertions into hashed collections. You will very likely
 discover it during integration tests when the time needed to execute test will
-dramatically increase. The worse scenario is the discovery in production...
+dramatically increase. The worse scenario is to discover such mistake in
+production...
 
 #How to deal with `equals` and `hashCode` invariant
 
@@ -152,3 +153,98 @@ invest into rewriting your code base into Lombok? You would be happy if there is
 some tool which can analyse bytecode of existing classes and it will report
 discrepancies in usage of fields between `equals` and `hashCode`. Is it even
 possible?
+
+I checked [FindBugs](http://findbugs.sourceforge.net/) if they provide such
+functionality and didn't find it.
+
+So I quickly implemented PoC
+[here](https://github.com/karl82/equalshashcodereporter). It is using
+[ASM](http://asm.ow2.org/) for bytecode analyses. Usage is very simple as
+feature set.
+
+* Currently detects only direct access to fields which are assigned in
+  constructors
+* If field is `final` and value is known during compilation, no `GETFIELD`
+  operand is generated :(
+
+```java
+package cz.rank.tests;
+
+import org.junit.Test;
+
+import java.util.Objects;
+
+public class EqualsHashCodeReporterTest {
+    @Test
+    public void emptyEqualsAndHashCodeProduceNoReport() throws Exception {
+        new EqualsHashCodeReporter(Object.class).report();
+    }
+
+    @Test(expected = AssertionError.class)
+    public void onlyInHashCodeProducesException() throws Exception {
+        new EqualsHashCodeReporter(OnlyHashCodeObject.class).report();
+    }
+
+    @Test(expected = AssertionError.class)
+    public void onlyInEqualsProducesException() throws Exception {
+        new EqualsHashCodeReporter(OnlyEqualsObject.class).report();
+    }
+
+    @Test(expected = AssertionError.class)
+    public void differentFieldsProduceException() throws Exception {
+        new EqualsHashCodeReporter(EqualsAndHashCodeDifferentObject.class).report();
+    }
+
+    private static class OnlyHashCodeObject {
+        private final int field;
+
+        private OnlyHashCodeObject(int field) {
+            this.field = field;
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(field);
+        }
+    }
+
+    private static class OnlyEqualsObject {
+        private final int field;
+
+        private OnlyEqualsObject(int field) {
+            this.field = field;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (!(o instanceof OnlyEqualsObject)) return false;
+            OnlyEqualsObject that = (OnlyEqualsObject) o;
+            return field == that.field;
+        }
+    }
+
+    private static class EqualsAndHashCodeDifferentObject {
+        private final int field;
+        private final int field2;
+
+        private EqualsAndHashCodeDifferentObject(int field) {
+            this.field = field;
+            this.field2 = field << 2;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (!(o instanceof EqualsAndHashCodeDifferentObject)) return false;
+            EqualsAndHashCodeDifferentObject that = (EqualsAndHashCodeDifferentObject) o;
+            return field == that.field;
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(field, field2);
+        }
+    }
+}
+```

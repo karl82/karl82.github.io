@@ -1,1 +1,0 @@
-karl82 blog

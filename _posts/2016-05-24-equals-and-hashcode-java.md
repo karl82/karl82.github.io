@@ -1,6 +1,6 @@
 ---
 title: Unit testing equals and hashCode methods
-layout: post
+layout: single
 category: java
 tags: [java, lombok, unittests]
 ---

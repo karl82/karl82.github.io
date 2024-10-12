@@ -1,5 +1,5 @@
 ---
-layout: post
+layout: single
 title: Usefull Vim links
 tags: [vim]
 modified: 2016-05-07

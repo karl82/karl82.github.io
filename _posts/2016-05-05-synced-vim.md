@@ -1,5 +1,5 @@
 ---
-layout: post
+layout: single
 title: Synced Vim across different locations
 category: howto
 tags: [vim, git, github]

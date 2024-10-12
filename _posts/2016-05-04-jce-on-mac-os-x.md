@@ -1,5 +1,5 @@
 ---
-layout: post
+layout: single
 title: JCE on Mac OS X
 category: [howto]
 tags: [macos, java, jce, brewcask]

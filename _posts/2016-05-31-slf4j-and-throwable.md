@@ -1,6 +1,6 @@
 ---
 title: SLF4J and logging throwables
-layout: post
+layout: single
 category: java
 tags: [java, slf4j, logging]
 ---
